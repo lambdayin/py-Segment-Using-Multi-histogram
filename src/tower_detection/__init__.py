@@ -1,0 +1,1 @@
+# Tower type detection module
