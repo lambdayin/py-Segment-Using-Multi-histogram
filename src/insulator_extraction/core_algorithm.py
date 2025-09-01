@@ -14,6 +14,7 @@ from .extraction_methods import (
     extract_insulators_vertical, extract_insulators_horizontal,
     extract_insulators_type4, extract_insulators_type51
 )
+from .precise_extraction import ins_extract_zl, ins_extract_zl1
 
 def type_inside_tree(tower_points, line_points, grid_width):
     """
@@ -33,32 +34,48 @@ def type_inside_tree(tower_points, line_points, grid_width):
     insulator_length = 0.0
     
     if len(tower_points) == 0:
+        print(f"DEBUG: No tower points available")
         return insulator_points, is_cable, insulator_length
+    
+    print(f"DEBUG: Processing {len(tower_points)} tower points, {len(line_points)} line points, grid={grid_width}")
     
     # Detect tower type
     tower_type = detect_tower_type(tower_points, line_points)
+    print(f"DEBUG: Detected tower type: {tower_type}")
     
     # Create binary projection for cross-arm detection
     bin_image_yz, _ = bin_projection(tower_points, grid_width, axis_x=1, axis_y=2)
+    print(f"DEBUG: Binary projection size: {bin_image_yz.shape}")
     
     # Detect cross-arm locations
     cross_locations = cross_location_detection(bin_image_yz, ratio=3)
+    print(f"DEBUG: Cross-arm locations: {cross_locations}")
     
     # Dispatch to appropriate extraction method based on tower type
     if tower_type in [TowerType.WINE_GLASS, TowerType.PORTAL]:
         # Wine glass tower, portal tower
+        print(f"DEBUG: Processing wine glass/portal tower")
         cross_line_clusters = split_point_cloud_2d(line_points, eps=0.1, 
                                                   min_clusters=1, max_clusters=10)
-        insulator_points, insulator_length = extract_insulators_vertical(
-            tower_points, cross_line_clusters, cross_locations, grid_width, tower_type
+        print(f"DEBUG: Line clusters: {len(cross_line_clusters)} clusters")
+        for i, cluster in enumerate(cross_line_clusters):
+            print(f"DEBUG: Cluster {i}: {len(cluster)} points")
+        insulator_points, insulator_length = ins_extract_zl(
+            tower_points, cross_line_clusters, cross_locations, grid_width, tower_type.value
         )
+        print(f"DEBUG: Extracted {len(insulator_points)} insulator points, length={insulator_length}")
         
     elif tower_type == TowerType.CAT_HEAD:
         # Cat head tower
+        print(f"DEBUG: Processing cat head tower")
         cross_line_clusters = split_point_cloud_c4(line_points, n_clusters=2, eps=0.6)
-        insulator_points, is_cable, insulator_length = extract_insulators_vertical_zl1(
+        print(f"DEBUG: Line clusters: {len(cross_line_clusters)} clusters")
+        for i, cluster in enumerate(cross_line_clusters):
+            print(f"DEBUG: Cluster {i}: {len(cluster)} points")
+        insulator_points, is_cable, insulator_length = ins_extract_zl1(
             tower_points, cross_line_clusters, cross_locations, grid_width
         )
+        print(f"DEBUG: Extracted {len(insulator_points)} insulator points, length={insulator_length}")
         
     elif tower_type == TowerType.SINGLE_CROSS:
         # Single cross-arm tower
@@ -93,11 +110,17 @@ def type_inside_tree(tower_points, line_points, grid_width):
         
     elif tower_type == TowerType.DC_DRUM:
         # DC drum tower
+        print(f"DEBUG: Processing DC drum tower")
         cross_line_clusters = split_point_cloud_2d(line_points, eps=0.1, 
                                                   min_clusters=3, max_clusters=10)
-        insulator_points, insulator_length = extract_insulators_vertical(
-            tower_points, cross_line_clusters, cross_locations, grid_width, tower_type
+        print(f"DEBUG: Line clusters: {len(cross_line_clusters)} clusters")
+        insulator_points, insulator_length = ins_extract_zl(
+            tower_points, cross_line_clusters, cross_locations, grid_width, tower_type.value
         )
+        print(f"DEBUG: Extracted {len(insulator_points)} insulator points, length={insulator_length}")
+    
+    else:
+        print(f"DEBUG: Unknown tower type {tower_type}, skipping extraction")
     
     return insulator_points, is_cable, insulator_length
 

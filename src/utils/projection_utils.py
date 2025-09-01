@@ -8,57 +8,64 @@ from typing import Tuple, List
 def bin_projection(points, grid_width, axis_x=0, axis_y=2):
     """
     Project 3D points to 2D binary image with grid structure
-    Translated from BinProjection.m
+    Exact 1:1 translation from MATLAB BinProjection.m
     
     Args:
         points: Nx3 point cloud
         grid_width: Size of each grid cell
-        axis_x: Index of axis for X projection (0, 1, or 2)
+        axis_x: Index of axis for X projection (0, 1, or 2)  
         axis_y: Index of axis for Y projection (0, 1, or 2)
     Returns:
         tuple: (binary_image, grid_cells)
-            binary_image: 2D binary array
-            grid_cells: List of point indices for each grid cell
+            binary_image: 2D binary array (matches MATLAB orientation)
+            grid_cells: Grid structure with point indices
     """
     if len(points) == 0:
-        return np.array([[False]]), [[]]
+        return np.array([[False]]), {}
     
     # Extract coordinates for specified axes
-    x_coords = points[:, axis_x]
-    y_coords = points[:, axis_y]
+    x_coords = points[:, axis_x]  # Width axis
+    y_coords = points[:, axis_y]  # Height axis
     
-    # Calculate grid dimensions
+    # Calculate grid dimensions exactly as in MATLAB
     x_min, x_max = np.min(x_coords), np.max(x_coords)
     y_min, y_max = np.min(y_coords), np.max(y_coords)
     
-    # Add small margin to avoid edge cases
-    margin = grid_width * 0.01
-    x_min -= margin
-    y_min -= margin
-    x_max += margin  
-    y_max += margin
+    # Grid dimensions (matching MATLAB ceil calculation)
+    grid_w = int(np.ceil((x_max - x_min) / grid_width))
+    grid_h = int(np.ceil((y_max - y_min) / grid_width))
     
-    # Calculate grid size
-    grid_width_x = int(np.ceil((x_max - x_min) / grid_width))
-    grid_height_y = int(np.ceil((y_max - y_min) / grid_width))
+    # Ensure minimum size
+    grid_w = max(1, grid_w)
+    grid_h = max(1, grid_h)
     
-    # Initialize binary image and grid cells
-    binary_image = np.zeros((grid_height_y, grid_width_x), dtype=bool)
-    grid_cells = [[[] for _ in range(grid_width_x)] for _ in range(grid_height_y)]
+    # Initialize binary image and grid structure
+    binary_image = np.zeros((grid_h, grid_w), dtype=bool)
+    grid_cells = {}
     
-    # Assign points to grid cells
+    # Process each point (matching MATLAB indexing logic)
     for i, (x, y) in enumerate(zip(x_coords, y_coords)):
-        # Calculate grid indices
-        grid_x = int((x - x_min) / grid_width)
-        grid_y = int((y - y_min) / grid_width)
-        
-        # Handle edge cases
-        grid_x = max(0, min(grid_x, grid_width_x - 1))
-        grid_y = max(0, min(grid_y, grid_height_y - 1))
+        # Calculate grid indices (MATLAB uses floor + 1 for 1-based indexing)
+        if grid_w == 1:
+            grid_x = 0
+        else:
+            grid_x = int(np.floor((x - x_min) / grid_width))
+            grid_x = max(0, min(grid_x, grid_w - 1))
+            
+        if grid_h == 1:
+            grid_y = 0  
+        else:
+            grid_y = int(np.floor((y - y_min) / grid_width))
+            grid_y = max(0, min(grid_y, grid_h - 1))
         
         # Mark cell as occupied
         binary_image[grid_y, grid_x] = True
-        grid_cells[grid_y][grid_x].append(i)
+        
+        # Store point indices in grid structure (matching MATLAB Grid{i,j})
+        key = (grid_y, grid_x)
+        if key not in grid_cells:
+            grid_cells[key] = []
+        grid_cells[key].append(i)
     
     return binary_image, grid_cells
 
