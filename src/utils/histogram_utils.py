@@ -119,62 +119,46 @@ def get_cut_pos1(binary_image):
     Returns:
         Cut position index (1-based to match MATLAB, or 0 if not found)
     """
-    print(f"DEBUG get_cut_pos1: Processing binary image of size {binary_image.shape}")
-    
     if binary_image.size == 0:
-        print("DEBUG get_cut_pos1: Empty binary image")
         return 0
     
-    # Get empty pixel count per row
+    # Get empty pixel count per row - exactly matching MATLAB logic
     epy = drow_z_barh(binary_image, direction=1, return_type='epy')
-    print(f"DEBUG get_cut_pos1: Empty pixel counts shape: {epy.shape}, sample: {epy[:5] if len(epy) > 5 else epy}")
     
-    # Create binary mask for empty/non-empty rows
+    # Create binary mask for empty/non-empty rows (MATLAB logic)
     epy0 = epy.copy()
     epy0[epy0 != 0] = -1  # Mark non-empty as -1
     epy0[epy0 == 0] = 1   # Mark empty as 1
     epy0[epy0 == -1] = 0  # Convert non-empty back to 0
     
-    print(f"DEBUG get_cut_pos1: Binary mask sample: {epy0[:5] if len(epy0) > 5 else epy0}")
-    
     # Find hole interval boundaries
     if len(epy0) < 2:
-        print("DEBUG get_cut_pos1: Insufficient rows for diff")
         return 0
         
     d_epy0 = np.diff(epy0)
     beg_indices = np.where(d_epy0 == 1)[0]  # Start of hole intervals
     
-    print(f"DEBUG get_cut_pos1: Found {len(beg_indices)} hole intervals")
-    
     if len(beg_indices) == 0:
-        print("DEBUG get_cut_pos1: No hole intervals found")
         return 0
     
     # Get density changes
     ds = drow_z_barh(binary_image, direction=1, return_type='Dsum')
-    print(f"DEBUG get_cut_pos1: Density changes shape: {ds.shape}")
     
     if len(ds) == 0:
-        print("DEBUG get_cut_pos1: No density changes")
         return 0
     
     # Find maximum density change position
     dwid_max_ind = np.argmax(ds)
-    print(f"DEBUG get_cut_pos1: Max density change at index {dwid_max_ind}")
     
     # Find first hole interval that starts after maximum density change
     valid_holes = beg_indices - dwid_max_ind >= 0
-    print(f"DEBUG get_cut_pos1: Valid holes after max density: {np.sum(valid_holes)}")
     
     if np.any(valid_holes):
         cut_pos_idx = np.where(valid_holes)[0][0]  # First valid hole
         # Convert to 1-based indexing to match MATLAB
         cut_pos = beg_indices[cut_pos_idx] + 1
-        print(f"DEBUG get_cut_pos1: Cut position found at {cut_pos}")
         return int(cut_pos)
     else:
-        print("DEBUG get_cut_pos1: No valid holes after max density change")
         return 0
 
 def fill_bin(histogram, fill_value=None):
@@ -283,3 +267,48 @@ def create_histogram_features(binary_image):
     features['VV'] = drow_z_barh(binary_image, direction=1, return_type='Dsum')
     
     return features
+
+def merge_location(locations, target_cross_num):
+    """
+    Merge locations to match target number of cross arms
+    Exact translation from MATLAB mergeLoc.m
+    
+    Args:
+        locations: List of [start, end] location pairs
+        target_cross_num: Target number of cross arms
+    Returns:
+        Merged locations list
+    """
+    if len(locations) <= target_cross_num:
+        return locations
+    
+    # Convert to numpy array for easier manipulation
+    loc_array = np.array(locations)
+    
+    while loc_array.shape[0] > target_cross_num:
+        # Calculate gaps between adjacent cross arms
+        gaps = loc_array[:-1, 1] - loc_array[1:, 0]  # end[i] - start[i+1]
+        
+        # Find minimum gap
+        min_gap_idx = np.argmin(gaps)
+        
+        # Merge the cross arms with minimum gap
+        loc_array[min_gap_idx, 1] = loc_array[min_gap_idx + 1, 1]  # Extend end
+        
+        # Remove the merged cross arm
+        loc_array = np.delete(loc_array, min_gap_idx + 1, axis=0)
+    
+    return loc_array.tolist()
+
+def detect_muta_in_bin(bin_array):
+    """
+    Detect mutation patterns in binary array
+    Complete 1:1 translation from MATLAB DetectMutaInBin.m
+    
+    Args:
+        bin_array: 1D array, usually histogram differences
+    Returns:
+        Detected mutation pattern array
+    """
+    from ..utils.missing_algorithms import detect_muta_in_bin as detect_func
+    return detect_func(bin_array)

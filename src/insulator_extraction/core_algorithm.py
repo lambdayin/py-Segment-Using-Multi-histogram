@@ -122,6 +122,7 @@ def type_inside_tree(tower_points, line_points, grid_width):
     else:
         print(f"DEBUG: Unknown tower type {tower_type}, skipping extraction")
     
+    print(f"DEBUG: type_inside_tree result: {len(insulator_points)} points, cable={is_cable}, length={insulator_length:.3f}")
     return insulator_points, is_cable, insulator_length
 
 def extract_insulators_vertical_zl1(tower_points, cross_line_clusters, cross_locations, grid_width):

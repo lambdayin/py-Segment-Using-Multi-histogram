@@ -8,7 +8,7 @@ from glob import glob
 from ..utils.pointcloud_utils import load_point_cloud
 from ..preprocessing.tower_alignment import preprocess_point_clouds
 from ..insulator_extraction.core_algorithm import process_multi_grid_extraction
-from ..insulator_extraction.adaptive_grid import adaptive_grid_tension, merge_insulator_results
+from ..insulator_extraction.adaptive_grid import adaptive_grid_tension, merge_insulator_results, merge_cell3
 from ..visualization.visualizer import drow_pts
 from ..core.constants import GRID_WIDTH_MIN, GRID_WIDTH_MAX, GRID_WIDTH_STEP
 
@@ -110,17 +110,24 @@ class InsulatorSegmentationPipeline:
         print("Applying adaptive grid optimization...")
         
         # Reshape results for adaptive_grid_tension function
-        # It expects (n_insulators, n_grid_widths) format
+        # MATLAB expects (n_insulators, n_grid_widths) format
         if all_insulator_results:
-            # For now, treat each grid result as a separate "insulator"
-            # In a full implementation, this would be more sophisticated
-            reshaped_insulators = [[result] for result in all_insulator_results]
-            reshaped_lengths = np.array([[length] for length in all_length_results])
+            print(f"DEBUG: Reshaping results - {len(all_insulator_results)} grid results")
+            
+            # For single-insulator-per-grid case, create proper matrix format
+            # This matches the MATLAB InsPtsInGrids and LenPtsInGrids structure
+            reshaped_insulators = [all_insulator_results]  # Single row of all grid results
+            reshaped_lengths = np.array([all_length_results])  # Single row of lengths
+            
+            print(f"DEBUG: Calling adaptive_grid_tension with shapes: insulators={len(reshaped_insulators)}x{len(reshaped_insulators[0])}, lengths={reshaped_lengths.shape}")
             
             final_insulators, final_lengths, final_indices, final_verticalities = adaptive_grid_tension(
                 reshaped_insulators, reshaped_lengths
             )
+            
+            print(f"DEBUG: Adaptive grid result: {len(final_insulators)} final points")
         else:
+            print("DEBUG: No insulator results to process")
             final_insulators = np.empty((0, 4))
             final_lengths = np.array([])
             final_indices = np.array([])
@@ -139,17 +146,25 @@ class InsulatorSegmentationPipeline:
             'grid_widths': self.grid_widths
         }
         
-        print(f"Extracted {len(final_insulators)} insulator points")
-        print(f"Final lengths: {final_lengths}")
+        print(f"Final extraction results:")
+        print(f"  - Insulator points: {len(final_insulators)}")
+        print(f"  - Insulator lengths: {final_lengths}")
+        print(f"  - Grid indices: {final_indices}")
+        print(f"  - Verticalities: {final_verticalities}")
         
-        # Visualization
+        # Visualization (matching MATLAB drowPts call)
         if visualize and len(final_insulators) > 0:
             print("Displaying results...")
-            drow_pts(
-                tower_rotated, '.b',
-                line_rotated, '.g', 
-                final_insulators[:, :3], '.r'
-            )
+            try:
+                drow_pts(
+                    tower_rotated, '.b',
+                    line_rotated, '.g', 
+                    final_insulators[:, :3], '.r'
+                )
+            except Exception as e:
+                print(f"Visualization error: {e}")
+        elif visualize:
+            print("No insulator points to visualize")
         
         return results
     

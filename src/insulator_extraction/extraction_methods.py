@@ -151,9 +151,8 @@ def extract_insulators_type4(tower_points, cross_line_clusters, cross_locations,
     from ..utils.math_utils import rotz, roty
     from ..utils.pointcloud_utils import cluster_points_dbscan, remove_duplicates
     from ..utils.plane_fitting import fit_plane_1, fit_plane_2
-    from ..utils.line_splitting import (
-        split_overline_4_mid1, cut_over_line, find_mutations, 
-        extra_ins_with_line_h1, remove_duplicate_points
+    from ..utils.extraction_helpers import (
+        split_overline_4_mid1, extra_ins_with_line_h1
     )
     from ..utils.projection_utils import bin_projection
     from ..utils.histogram_utils import drow_z_barh
@@ -207,7 +206,7 @@ def extract_insulators_type4(tower_points, cross_line_clusters, cross_locations,
                         if len(cross_cells[i]) > 5:
                             try:
                                 ins, length = extra_ins_with_line_h1(
-                                    cross_cells[i], cross_tower_pts1, fit_line[i], True, grid_width
+                                    cross_cells[i], cross_tower_pts1, fit_line[i], 1, grid_width
                                 )
                                 if len(ins) > 0:
                                     ins_pts[i] = ins
@@ -219,7 +218,7 @@ def extract_insulators_type4(tower_points, cross_line_clusters, cross_locations,
         # First cross-arm insulator extraction (vertical)
         if len(cross_line_clusters) > 0:
             cross_line1 = cross_line_clusters[0]
-            over_l = remove_duplicate_points(cross_line1, cross_line1, 0.001)  # Remove self-duplicates
+            over_l = remove_duplicates(cross_line1, tolerance=0.001)  # Remove self-duplicates
             
             # Filter based on tower type
             if tower_type == 3 and len(cross_locations) > 0:
@@ -319,7 +318,7 @@ def extract_insulators_type4(tower_points, cross_line_clusters, cross_locations,
                             # Simplified extraction for second cross-arm
                             try:
                                 ins, length = extra_ins_with_line_h1(
-                                    hl, cp2, fit_line[i % len(fit_line)], False, grid_width
+                                    hl, cp2, fit_line[i % len(fit_line)], 0, grid_width
                                 )
                                 if len(ins) > 0:
                                     idx = 4 + i  # Simplified indexing
